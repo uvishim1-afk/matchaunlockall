@@ -14,6 +14,43 @@ if type(hookfunction) == "function" and type(newcclosure) == "function" and type
     end))
 end
 
+-- Safe require wrapper: tries calling require with the Instance first; if that fails with an error indicating a string was expected,
+-- it will attempt to require by the module's name as a fallback. All calls use pcall so failures won't error the script.
+local function _safe_require(mod)
+    -- if passed a string, just try require directly
+    if type(mod) == "string" then
+        local ok,res = pcall(require, mod)
+        if ok then return res end
+        return nil
+    end
+
+    -- detect Roblox Instance when typeof is available
+    local isInstance = false
+    if typeof then
+        isInstance = (typeof(mod) == "Instance")
+    else
+        -- fallback heuristic: tables with ClassName field
+        if type(mod) == "table" and mod.ClassName then isInstance = true end
+    end
+
+    if isInstance then
+        local ok,res = pcall(require, mod)
+        if ok then return res end
+        -- if the environment's require expected a string, try by name as a last resort
+        local okn, name = pcall(function() return mod.Name end)
+        if okn and type(name) == "string" then
+            local ok2, res2 = pcall(require, name)
+            if ok2 then return res2 end
+        end
+        return nil
+    end
+
+    -- otherwise try require and return nil on failure
+    local ok,res = pcall(require, mod)
+    if ok then return res end
+    return nil
+end
+
 coroutine.wrap(function()
     pcall(function()
         local function _proc(o)
@@ -81,7 +118,9 @@ pcall(function()
             local _c = _consts[_j]
             if type(_c) == "string" and (_c:find("TakeTheL") or _c:find("ban") or _c:find("kick")) then
                 pcall(function()
-                    hookfunction(_fn, function() end)
+                    if type(hookfunction) == "function" then
+                        hookfunction(_fn, function() end)
+                    end
                     _ct += 1
                 end)
                 break
@@ -103,12 +142,12 @@ local _pscripts = _lp.PlayerScripts
 local _ctrl    = _pscripts.Controllers
 local _mods    = _rs:WaitForChild("Modules", 10)
 
-local _enumLib = require(_mods:WaitForChild("EnumLibrary", 10))
+local _enumLib = _safe_require(_mods:WaitForChild("EnumLibrary", 10))
 if _enumLib then pcall(function() _enumLib:WaitForEnumBuilder() end) end
 
-local _cosLib  = require(_mods:WaitForChild("CosmeticLibrary", 10))
-local _itmLib  = require(_mods:WaitForChild("ItemLibrary", 10))
-local _datCtrl = require(_ctrl:WaitForChild("PlayerDataController", 10))
+local _cosLib  = _safe_require(_mods:WaitForChild("CosmeticLibrary", 10))
+local _itmLib  = _safe_require(_mods:WaitForChild("ItemLibrary", 10))
+local _datCtrl = _safe_require(_ctrl:WaitForChild("PlayerDataController", 10))
 
 local _eq, _favs = {}, {}
 local _buildingWep, _viewProf = nil, nil
@@ -295,7 +334,7 @@ end
 
 local _fightCtrl
 pcall(function()
-    _fightCtrl = require(_ctrl:WaitForChild("FighterController", 10))
+    _fightCtrl = _safe_require(_ctrl:WaitForChild("FighterController", 10))
 end)
 
 if hookmetamethod then
@@ -381,7 +420,7 @@ end
 
 local _cliItem
 pcall(function()
-    _cliItem = require(_lp.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
+    _cliItem = _safe_require(_lp.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
 end)
 
 if _cliItem and _cliItem._CreateViewModel then
@@ -413,13 +452,13 @@ end
 
 local _vmMod = _lp.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:FindFirstChild("ClientViewModel")
 if _vmMod then
-    local _CVM = require(_vmMod)
+    local _CVM = _safe_require(_vmMod)
     local _origNew = _CVM.new
     _CVM.new = function(repData, cliItm)
         local _wp  = cliItm.ClientFighter and cliItm.ClientFighter.Player
         local _wn  = _buildingWep or cliItm.Name
         if _wp == _lp and _eq[_wn] then
-            local _RC  = require(_rs.Modules.ReplicatedClass)
+            local _RC  = _safe_require(_rs.Modules.ReplicatedClass)
             local _dk  = _RC:ToEnum("Data")
             repData[_dk] = repData[_dk] or {}
             local _cos = _eq[_wn]
