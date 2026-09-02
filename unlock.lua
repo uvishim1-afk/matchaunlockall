@@ -157,6 +157,18 @@ local _cosLib  = _safe_require(_mods:WaitForChild("CosmeticLibrary", 10))
 local _itmLib  = _safe_require(_mods:WaitForChild("ItemLibrary", 10))
 local _datCtrl = _safe_require(_ctrl:WaitForChild("PlayerDataController", 10))
 
+-- Ensure _cosLib exists and provide safe defaults to avoid indexing nil
+if not _cosLib or type(_cosLib) ~= "table" then
+    _cosLib = {}
+end
+_cosLib.Cosmetics = _cosLib.Cosmetics or {}
+
+-- Preserve original methods when present; provide safe fallbacks otherwise
+local _origOwnsCosmetic = (_cosLib.OwnsCosmetic and type(_cosLib.OwnsCosmetic) == "function") and _cosLib.OwnsCosmetic or function() return false end
+local _origOwnsNormally = (_cosLib.OwnsCosmeticNormally and type(_cosLib.OwnsCosmeticNormally) == "function") and _cosLib.OwnsCosmeticNormally or _origOwnsCosmetic
+local _origOwnsUniversally = (_cosLib.OwnsCosmeticUniversally and type(_cosLib.OwnsCosmeticUniversally) == "function") and _cosLib.OwnsCosmeticUniversally or _origOwnsCosmetic
+local _origOwnsForWeapon = (_cosLib.OwnsCosmeticForWeapon and type(_cosLib.OwnsCosmeticForWeapon) == "function") and _cosLib.OwnsCosmeticForWeapon or _origOwnsCosmetic
+
 local _eq, _favs = {}, {}
 local _buildingWep, _viewProf = nil, nil
 local _lastWep = nil
@@ -264,30 +276,30 @@ local function _isCosType(cosObj)
     return false
 end
 
+-- Safe overrides that call preserved originals
 _cosLib.OwnsCosmeticNormally = function(self, inv, nm, wep)
-    local c = _cosLib.Cosmetics[nm]
+    local c = (_cosLib and _cosLib.Cosmetics) and _cosLib.Cosmetics[nm]
     if c and c.Type == "Skin" then return true end
-    return false
+    return _origOwnsNormally(self, inv, nm, wep)
 end
 _cosLib.OwnsCosmeticUniversally = function(self, inv, nm, wep)
-    local c = _cosLib.Cosmetics[nm]
+    local c = (_cosLib and _cosLib.Cosmetics) and _cosLib.Cosmetics[nm]
     if c and c.Type == "Skin" then return true end
-    return false
+    return _origOwnsUniversally(self, inv, nm, wep)
 end
 _cosLib.OwnsCosmeticForWeapon = function(self, inv, nm, wep)
-    local c = _cosLib.Cosmetics[nm]
+    local c = (_cosLib and _cosLib.Cosmetics) and _cosLib.Cosmetics[nm]
     if c and c.Type == "Skin" then return true end
-    return false
+    return _origOwnsForWeapon(self, inv, nm, wep)
 end
 
-local _origOwns = _cosLib.OwnsCosmetic
 _cosLib.OwnsCosmetic = function(self, inv, nm, wep)
-    if nm:find("MISSING_") or nm == "Bubble Gun" then
-        return _origOwns(self, inv, nm, wep)
+    if type(nm) == "string" and (nm:find("MISSING_") or nm == "Bubble Gun") then
+        return _origOwnsCosmetic(self, inv, nm, wep)
     end
-    local c = _cosLib.Cosmetics[nm]
+    local c = (_cosLib and _cosLib.Cosmetics) and _cosLib.Cosmetics[nm]
     if c and _isCosType(c) then return true end
-    return _origOwns(self, inv, nm, wep)
+    return _origOwnsCosmetic(self, inv, nm, wep)
 end
 
 local _origGet = _datCtrl.Get
