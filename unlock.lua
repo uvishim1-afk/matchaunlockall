@@ -14,39 +14,47 @@ if type(hookfunction) == "function" and type(newcclosure) == "function" and type
     end))
 end
 
--- Safe require wrapper: tries calling require with the Instance first; if that fails with an error indicating a string was expected,
--- it will attempt to require by the module's name as a fallback. All calls use pcall so failures won't error the script.
+-- Improved safe require wrapper: pcall(require, arg) first; on failure, inspect the error string
+-- and if it indicates a string was expected, try requiring by the module's Name as a fallback.
 local function _safe_require(mod)
-    -- if passed a string, just try require directly
+    local function try_require(x)
+        local ok, res = pcall(require, x)
+        if ok then return true, res end
+        return false, res
+    end
+
     if type(mod) == "string" then
-        local ok,res = pcall(require, mod)
+        local ok, res = try_require(mod)
         if ok then return res end
         return nil
     end
 
-    -- detect Roblox Instance when typeof is available
+    -- detect Instance when typeof is available
     local isInstance = false
     if typeof then
         isInstance = (typeof(mod) == "Instance")
     else
-        -- fallback heuristic: tables with ClassName field
-        if type(mod) == "table" and mod.ClassName then isInstance = true end
+        isInstance = (type(mod) == "table" and mod.ClassName ~= nil)
     end
 
     if isInstance then
-        local ok,res = pcall(require, mod)
+        -- try requiring the instance
+        local ok, res = try_require(mod)
         if ok then return res end
-        -- if the environment's require expected a string, try by name as a last resort
-        local okn, name = pcall(function() return mod.Name end)
-        if okn and type(name) == "string" then
-            local ok2, res2 = pcall(require, name)
-            if ok2 then return res2 end
+
+        -- if require failed, inspect error message
+        if type(res) == "string" then
+            local lowered = res:lower()
+            if lowered:find("string expected") or (lowered:find("expected") and lowered:find("string")) then
+                local ok2, res2 = try_require(mod.Name)
+                if ok2 then return res2 end
+            end
         end
+
         return nil
     end
 
-    -- otherwise try require and return nil on failure
-    local ok,res = pcall(require, mod)
+    local ok, res = try_require(mod)
     if ok then return res end
     return nil
 end
@@ -450,7 +458,7 @@ if _cliItem and _cliItem._CreateViewModel then
     end
 end
 
-local _vmMod = _lp.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:FindFirstChild("ClientViewModel")
+local _vmMod = _lp.PlayerScripts.Modules.ClientReplicatedClasses.ClientItem:FindFirstChild("ClientViewModel")
 if _vmMod then
     local _CVM = _safe_require(_vmMod)
     local _origNew = _CVM.new
