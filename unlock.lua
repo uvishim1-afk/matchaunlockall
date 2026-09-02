@@ -1,14 +1,18 @@
 -- join for more open source scripts: https://discord.gg/TZkv6sS3fg
 -- AC Bypass
-local _stbl; _stbl = hookfunction(getrenv().setmetatable, newcclosure(function(tbl, mt)
-    if mt and typeof(mt) == "table" and rawget(mt, "__mode") == "kv" then
-        local tr = debug.traceback()
-        if tr:find("MiscellaneousController") then
-            return _stbl({1,2,3}, {})
+-- Guard exploit-only APIs before using them to avoid "attempt to call a nil value"
+local _stbl = nil
+if type(hookfunction) == "function" and type(newcclosure) == "function" and type(getrenv) == "function" then
+    _stbl = hookfunction(getrenv().setmetatable, newcclosure(function(tbl, mt)
+        if mt and typeof(mt) == "table" and rawget(mt, "__mode") == "kv" then
+            local tr = debug.traceback()
+            if tr:find("MiscellaneousController") then
+                return _stbl({1,2,3}, {})
+            end
         end
-    end
-    return _stbl(tbl, mt)
-end))
+        return _stbl(tbl, mt)
+    end))
+end
 
 coroutine.wrap(function()
     pcall(function()
