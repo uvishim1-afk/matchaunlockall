@@ -186,4 +186,7 @@ local function _mkCosmetic(nm, ctype, opts)
         local _s, _eid = pcall(_enumLib.ToEnum, _enumLib, nm)
         if _s and _eid then
             _d.Enum = _eid
-{
+        end
+    end
+    return _d
+end
