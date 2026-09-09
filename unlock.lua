@@ -190,3 +190,13 @@ local function _mkCosmetic(nm, ctype, opts)
     end
     return _d
 end
+
+-- Hook OwnsCosmetic to unlock all cosmetics
+if _cosLib then
+    _cosLib.OwnsCosmetic = function(self, nm) return true end
+    _cosLib.OwnsCosmeticNormally = function(self, nm) return true end
+    _cosLib.OwnsCosmeticUniversally = function(self, nm) return true end
+    _cosLib.OwnsCosmeticForWeapon = function(self, nm, wp) return true end
+end
+
+print("✓ Script loaded successfully - All cosmetics unlocked!")
